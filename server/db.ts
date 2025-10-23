@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, csvDatasets, chartConfigs, dataInsights, CsvDataset, ChartConfig, DataInsight } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,132 @@ export async function getUser(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// CSV Dataset queries
+export async function createCsvDataset(userId: number, fileName: string, rawCsv: string, headers: string[], rowCount: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(csvDatasets).values({
+    userId,
+    fileName,
+    rawCsv,
+    headers,
+    rowCount,
+  });
+
+  return result;
+}
+
+export async function getCsvDataset(datasetId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(csvDatasets).where(eq(csvDatasets.id, datasetId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getUserCsvDatasets(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(csvDatasets).where(eq(csvDatasets.userId, userId));
+}
+
+export async function deleteCsvDataset(datasetId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.delete(csvDatasets).where(eq(csvDatasets.id, datasetId));
+}
+
+// Chart Configuration queries
+export async function createChartConfig(
+  datasetId: number,
+  chartType: string,
+  labelColumn: number,
+  datasets: number[],
+  datasetColors: Record<string, string>,
+  palette: string,
+  baseColor: string,
+  canvasBg: string,
+  textColor: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(chartConfigs).values({
+    datasetId,
+    chartType,
+    labelColumn,
+    datasets,
+    datasetColors,
+    palette,
+    baseColor,
+    canvasBg,
+    textColor,
+  });
+
+  return result;
+}
+
+export async function getChartConfig(configId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(chartConfigs).where(eq(chartConfigs.id, configId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getDatasetChartConfigs(datasetId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(chartConfigs).where(eq(chartConfigs.datasetId, datasetId));
+}
+
+export async function updateChartConfig(
+  configId: number,
+  updates: Partial<Omit<ChartConfig, 'id' | 'datasetId' | 'createdAt'>>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.update(chartConfigs).set(updates).where(eq(chartConfigs.id, configId));
+}
+
+// Data Insights queries
+export async function createDataInsight(
+  datasetId: number,
+  insightType: string,
+  title: string,
+  content: string,
+  confidence: number = 0
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(dataInsights).values({
+    datasetId,
+    insightType,
+    title,
+    content,
+    confidence,
+  });
+
+  return result;
+}
+
+export async function getDatasetInsights(datasetId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(dataInsights).where(eq(dataInsights.datasetId, datasetId));
+}
+
+export async function deleteDatasetInsights(datasetId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.delete(dataInsights).where(eq(dataInsights.datasetId, datasetId));
+}
+

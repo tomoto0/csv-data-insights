@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -28,4 +28,57 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * CSV Dataset table - stores uploaded CSV files and their metadata
+ */
+export const csvDatasets = mysqlTable("csvDatasets", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  rawCsv: text("rawCsv").notNull(),
+  headers: json("headers").$type<string[]>().notNull(),
+  rowCount: int("rowCount").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CsvDataset = typeof csvDatasets.$inferSelect;
+export type InsertCsvDataset = typeof csvDatasets.$inferInsert;
+
+/**
+ * Chart Configuration table - stores chart settings and visualizations
+ */
+export const chartConfigs = mysqlTable("chartConfigs", {
+  id: int("id").autoincrement().primaryKey(),
+  datasetId: int("datasetId").notNull(),
+  chartType: varchar("chartType", { length: 50 }).notNull(), // bar, line, pie, doughnut
+  labelColumn: int("labelColumn").notNull(),
+  datasets: json("datasets").$type<number[]>().notNull(),
+  datasetColors: json("datasetColors").$type<Record<string, string>>().notNull(),
+  palette: varchar("palette", { length: 50 }).default("vibrant").notNull(),
+  baseColor: varchar("baseColor", { length: 7 }).default("#6b76ff").notNull(),
+  canvasBg: varchar("canvasBg", { length: 7 }).default("#0b0f20").notNull(),
+  textColor: varchar("textColor", { length: 7 }).default("#f1f3ff").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ChartConfig = typeof chartConfigs.$inferSelect;
+export type InsertChartConfig = typeof chartConfigs.$inferInsert;
+
+/**
+ * Data Insights table - stores AI-generated insights about datasets
+ */
+export const dataInsights = mysqlTable("dataInsights", {
+  id: int("id").autoincrement().primaryKey(),
+  datasetId: int("datasetId").notNull(),
+  insightType: varchar("insightType", { length: 100 }).notNull(), // summary, trends, anomalies, recommendations
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  confidence: int("confidence").default(0).notNull(), // 0-100
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DataInsight = typeof dataInsights.$inferSelect;
+export type InsertDataInsight = typeof dataInsights.$inferInsert;
+
