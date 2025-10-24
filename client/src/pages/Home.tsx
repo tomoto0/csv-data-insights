@@ -60,8 +60,16 @@ export default function Home() {
     if (!csvData || !fileName) return;
 
     try {
+      // Build CSV content
       const rawCsv = csvData.headers.join(',') + '\n' + 
                      csvData.rows.map(r => r.join(',')).join('\n');
+      
+      // Check payload size
+      const payloadSize = new Blob([rawCsv]).size;
+      if (payloadSize > 10 * 1024 * 1024) {
+        alert('CSV file is too large (>10MB). Please upload a smaller file.');
+        return;
+      }
       
       await uploadMutation.mutateAsync({
         fileName,
@@ -80,6 +88,7 @@ export default function Home() {
       setFileName("");
     } catch (error) {
       console.error("Upload failed:", error);
+      alert('Upload failed. Please try again.');
     }
   };
 
@@ -99,6 +108,7 @@ export default function Home() {
       insightsQuery.refetch();
     } catch (error) {
       console.error("Insights generation failed:", error);
+      alert('Failed to generate insights. Please try again.');
     }
   };
 
