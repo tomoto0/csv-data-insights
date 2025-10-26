@@ -5,10 +5,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { APP_TITLE, getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { 
   Loader2, Upload, Sparkles, BarChart3, TrendingUp, AlertCircle, 
-  Brain, FileText, Zap, CheckCircle, AlertTriangle, Info, Download
+  Brain, FileText, Zap, CheckCircle, AlertTriangle, Info, Download,
+  LineChart, PieChart, Activity, Target, Shield, Lightbulb
 } from "lucide-react";
 
 interface ParsedData {
@@ -16,26 +17,65 @@ interface ParsedData {
   rows: string[][];
 }
 
-interface AnalysisResult {
-  summary: string;
-  keyFindings: string[];
-  recommendations: string[];
-  warnings: string[];
-  dataQuality: number;
+interface Insight {
+  id: number;
+  title: string;
+  content: string;
+  insightType: string;
+  confidence: number;
 }
+
+const categoryIcons: Record<string, any> = {
+  overview: <BarChart3 className="w-5 h-5" />,
+  quality: <Shield className="w-5 h-5" />,
+  statistics: <Activity className="w-5 h-5" />,
+  trends: <TrendingUp className="w-5 h-5" />,
+  anomalies: <AlertTriangle className="w-5 h-5" />,
+  insights: <Lightbulb className="w-5 h-5" />,
+  recommendations: <Target className="w-5 h-5" />,
+  risks: <AlertCircle className="w-5 h-5" />
+};
+
+const categoryColors: Record<string, string> = {
+  overview: "bg-blue-50 border-blue-200 text-blue-900",
+  quality: "bg-green-50 border-green-200 text-green-900",
+  statistics: "bg-purple-50 border-purple-200 text-purple-900",
+  trends: "bg-amber-50 border-amber-200 text-amber-900",
+  anomalies: "bg-red-50 border-red-200 text-red-900",
+  insights: "bg-cyan-50 border-cyan-200 text-cyan-900",
+  recommendations: "bg-indigo-50 border-indigo-200 text-indigo-900",
+  risks: "bg-orange-50 border-orange-200 text-orange-900"
+};
+
+const categoryBorders: Record<string, string> = {
+  overview: "border-l-blue-600",
+  quality: "border-l-green-600",
+  statistics: "border-l-purple-600",
+  trends: "border-l-amber-600",
+  anomalies: "border-l-red-600",
+  insights: "border-l-cyan-600",
+  recommendations: "border-l-indigo-600",
+  risks: "border-l-orange-600"
+};
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
   const [csvData, setCsvData] = useState<ParsedData | null>(null);
   const [fileName, setFileName] = useState("");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const datasetsQuery = trpc.csv.list.useQuery(undefined, { enabled: isAuthenticated });
   const uploadMutation = trpc.csv.upload.useMutation();
   const generateInsightsMutation = trpc.insights.generate.useMutation();
+  const [datasetId, setDatasetId] = useState<number | null>(null);
+  const insightsQuery = trpc.insights.list.useQuery(
+    { datasetId: datasetId || 0 },
+    { enabled: !!datasetId }
+  );
 
   const parseCSV = (text: string): ParsedData => {
     const lines = text.trim().split('\n');
@@ -79,43 +119,28 @@ export default function Home() {
         rowCount: csvData.rows.length,
       });
 
-      // Get the dataset ID from the result
-      const datasetId = (uploadResult as any)?.insertId || (uploadResult as any)?.lastInsertRowid || 1;
+      const newDatasetId = (uploadResult as any)?.insertId || (uploadResult as any)?.lastInsertRowid || 1;
+      setDatasetId(newDatasetId);
 
-      // Generate insights immediately after upload
+      // Generate insights with Manus LLM
       try {
         await generateInsightsMutation.mutateAsync({
-          datasetId,
+          datasetId: newDatasetId,
           csvContent: rawCsv,
           headers: csvData.headers,
         });
+
+        // Fetch insights after generation
+        setTimeout(async () => {
+          const result = await insightsQuery.refetch();
+          if (result.data) {
+            setInsights(result.data as any);
+          }
+        }, 1000);
       } catch (insightError) {
-        console.warn("Insights generation failed, continuing with mock data", insightError);
+        console.warn("Insights generation failed", insightError);
       }
 
-      // Simulate analysis for demo
-      const mockAnalysis: AnalysisResult = {
-        summary: `Analyzed ${csvData.rows.length} rows with ${csvData.headers.length} columns. Data appears to be well-structured with consistent formatting.`,
-        keyFindings: [
-          `Dataset contains ${csvData.rows.length} records across ${csvData.headers.length} fields`,
-          'Data quality score is high with minimal missing values',
-          'Temporal patterns detected in the data',
-          'Multiple data categories identified for cross-analysis'
-        ],
-        recommendations: [
-          'Consider aggregating data by time periods for trend analysis',
-          'Apply statistical methods to identify outliers',
-          'Use machine learning for predictive modeling',
-          'Create visualizations for stakeholder reporting'
-        ],
-        warnings: [
-          'Ensure data privacy compliance before sharing',
-          'Validate data sources for accuracy'
-        ],
-        dataQuality: 92
-      };
-
-      setAnalysis(mockAnalysis);
       setShowUploadDialog(false);
       setCsvData(null);
       setFileName("");
@@ -132,7 +157,6 @@ export default function Home() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
           <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-2000"></div>
@@ -148,27 +172,27 @@ export default function Home() {
                 </div>
               </div>
               <h1 className="text-4xl font-bold text-white mb-2">{APP_TITLE}</h1>
-              <p className="text-lg text-slate-300">AI-Powered Data Intelligence Platform</p>
+              <p className="text-lg text-slate-300">Professional Data Intelligence Platform</p>
             </div>
 
             <Card className="bg-slate-800 border-slate-700 shadow-2xl">
               <CardContent className="pt-8 space-y-6">
                 <p className="text-slate-300 text-center">
-                  Upload your CSV files and unlock powerful AI-driven insights. Analyze trends, detect anomalies, and make data-driven decisions with ease.
+                  Upload your CSV files and unlock comprehensive AI-driven insights. Advanced statistical analysis, trend detection, and professional recommendations.
                 </p>
                 
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 text-slate-300">
                     <CheckCircle className="w-5 h-5 text-green-400" />
-                    <span>Advanced data analysis</span>
+                    <span>Comprehensive statistical analysis</span>
                   </div>
                   <div className="flex items-center gap-3 text-slate-300">
                     <CheckCircle className="w-5 h-5 text-green-400" />
-                    <span>AI-powered insights</span>
+                    <span>Multi-faceted AI insights</span>
                   </div>
                   <div className="flex items-center gap-3 text-slate-300">
                     <CheckCircle className="w-5 h-5 text-green-400" />
-                    <span>Real-time visualization</span>
+                    <span>Professional visualizations</span>
                   </div>
                 </div>
 
@@ -197,7 +221,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{APP_TITLE}</h1>
-              <p className="text-xs text-slate-500">AI Data Intelligence</p>
+              <p className="text-xs text-slate-500">Professional Data Intelligence</p>
             </div>
           </div>
           <div className="text-sm text-slate-600">
@@ -207,8 +231,8 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-12">
-        {!analysis ? (
+      <main className="max-w-7xl mx-auto px-6 py-12">
+        {insights.length === 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Upload Card */}
             <div className="lg:col-span-1">
@@ -219,7 +243,7 @@ export default function Home() {
                     Upload Data
                   </CardTitle>
                   <CardDescription>
-                    Start your analysis journey
+                    Start your analysis
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-4">
@@ -238,10 +262,35 @@ export default function Home() {
                         {datasetsQuery.data.slice(-3).map((dataset) => (
                           <button
                             key={dataset.id}
-                            onClick={() => {
+                            onClick={async () => {
                               const parsed = parseCSV(dataset.rawCsv);
                               setCsvData(parsed);
                               setFileName(dataset.fileName);
+                              setDatasetId(dataset.id);
+                              setIsAnalyzing(true);
+                              try {
+                                const result = await insightsQuery.refetch();
+                                if (result.data && result.data.length > 0) {
+                                  setInsights(result.data as any);
+                                } else {
+                                  const rawCsv = dataset.rawCsv;
+                                  await generateInsightsMutation.mutateAsync({
+                                    datasetId: dataset.id,
+                                    csvContent: rawCsv,
+                                    headers: dataset.headers,
+                                  });
+                                  setTimeout(async () => {
+                                    const newResult = await insightsQuery.refetch();
+                                    if (newResult.data) {
+                                      setInsights(newResult.data as any);
+                                    }
+                                  }, 1000);
+                                }
+                              } catch (error) {
+                                console.error("Error:", error);
+                              } finally {
+                                setIsAnalyzing(false);
+                              }
                             }}
                             className="w-full text-left p-3 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all"
                           >
@@ -262,23 +311,27 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Brain className="w-5 h-5 text-blue-600" />
-                    AI-Powered Analysis
+                    Professional Analysis
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-slate-600">
-                  <p>Our advanced AI engine analyzes your data to uncover hidden patterns, trends, and insights that matter to your business.</p>
+                  <p>Our advanced AI engine performs comprehensive data analysis across multiple dimensions:</p>
                   <ul className="space-y-2">
                     <li className="flex items-start gap-2">
+                      <Activity className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                      <span>Statistical analysis (mean, median, std dev, quartiles)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
                       <TrendingUp className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span>Trend detection and forecasting</span>
+                      <span>Trend detection and temporal patterns</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
                       <span>Anomaly and outlier detection</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                      <span>Actionable recommendations</span>
+                      <Sparkles className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <span>Data quality assessment</span>
                     </li>
                   </ul>
                 </CardContent>
@@ -288,16 +341,36 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Zap className="w-5 h-5 text-purple-600" />
-                    Quick Start
+                    Analysis Categories
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-slate-600">
-                  <ol className="space-y-2 list-decimal list-inside">
-                    <li>Upload your CSV file</li>
-                    <li>Our AI analyzes the data instantly</li>
-                    <li>Receive comprehensive insights</li>
-                    <li>Export results and recommendations</li>
-                  </ol>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                      <span>Overview & Structure</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                      <span>Data Quality</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                      <span>Statistics</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
+                      <span>Trends</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-600 rounded-full"></div>
+                      <span>Anomalies</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-cyan-600 rounded-full"></div>
+                      <span>Insights</span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -308,116 +381,79 @@ export default function Home() {
             {/* Header with back button */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-3xl font-bold text-slate-900">Analysis Results</h2>
+                <h2 className="text-3xl font-bold text-slate-900">Comprehensive Analysis</h2>
                 <p className="text-slate-600 mt-1">{fileName}</p>
               </div>
               <Button 
                 variant="outline"
-                onClick={() => setAnalysis(null)}
+                onClick={() => {
+                  setInsights([]);
+                  setCsvData(null);
+                  setFileName("");
+                }}
               >
                 New Analysis
               </Button>
             </div>
 
-            {/* Data Quality Score */}
-            <Card className="shadow-lg border-l-4 border-l-green-600">
-              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
-                <CardTitle className="text-lg">Data Quality Score</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-6">
-                  <div className="relative w-32 h-32">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="45" fill="none" stroke="#e2e8f0" strokeWidth="8" />
-                      <circle 
-                        cx="50" 
-                        cy="50" 
-                        r="45" 
-                        fill="none" 
-                        stroke="#22c55e" 
-                        strokeWidth="8"
-                        strokeDasharray={`${analysis.dataQuality * 2.83} 283`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <p className="text-3xl font-bold text-slate-900">{analysis.dataQuality}%</p>
-                        <p className="text-xs text-slate-500">Quality</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <p className="text-slate-700 font-semibold">Excellent Data Quality</p>
-                    <p className="text-slate-600 text-sm">{analysis.summary}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Category Filter */}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  selectedCategory === null
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                All Insights
+              </button>
+              {Object.keys(categoryColors).map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all capitalize ${
+                    selectedCategory === cat
+                      ? `${categoryColors[cat]} border border-current`
+                      : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
 
-            {/* Key Findings */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  Key Findings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {analysis.keyFindings.map((finding, idx) => (
-                    <div key={idx} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-start gap-3">
-                        <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-slate-700 text-sm">{finding}</p>
+            {/* Insights Grid */}
+            <div className="grid grid-cols-1 gap-4">
+              {insights
+                .filter(insight => !selectedCategory || insight.insightType === selectedCategory)
+                .map((insight) => (
+                  <Card 
+                    key={insight.id} 
+                    className={`shadow-lg border-l-4 ${categoryBorders[insight.insightType] || 'border-l-slate-600'}`}
+                  >
+                    <CardContent className="pt-6">
+                      <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-lg ${categoryColors[insight.insightType] || 'bg-slate-50'}`}>
+                          {categoryIcons[insight.insightType] || <Info className="w-5 h-5" />}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h3 className="font-semibold text-lg text-slate-900">{insight.title}</h3>
+                              <p className="text-xs text-slate-500 capitalize mt-1">{insight.insightType}</p>
+                            </div>
+                            <span className="text-sm font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full whitespace-nowrap">
+                              {insight.confidence}%
+                            </span>
+                          </div>
+                          <p className="text-slate-700 mt-3 leading-relaxed">{insight.content}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recommendations */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  Recommendations
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-3">
-                  {analysis.recommendations.map((rec, idx) => (
-                    <div key={idx} className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                      <Zap className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                      <p className="text-slate-700 text-sm">{rec}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Warnings */}
-            {analysis.warnings.length > 0 && (
-              <Card className="shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 border-b">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-orange-600" />
-                    Important Notes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="space-y-3">
-                    {analysis.warnings.map((warning, idx) => (
-                      <div key={idx} className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                        <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-slate-700 text-sm">{warning}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    </CardContent>
+                  </Card>
+                ))}
+            </div>
 
             {/* Export Section */}
             <Card className="shadow-lg">
@@ -447,7 +483,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>Upload CSV File</DialogTitle>
             <DialogDescription>
-              Select a CSV file to analyze with AI
+              Select a CSV file for professional AI analysis
             </DialogDescription>
           </DialogHeader>
 

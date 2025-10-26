@@ -7,6 +7,52 @@ import * as db from "./db";
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from "@trpc/server";
 
+// Helper function to calculate statistics
+function calculateStatistics(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+  const stdDev = Math.sqrt(variance);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  const iqr = q3 - q1;
+  
+  return { mean, median, stdDev, min, max, q1, q3, iqr, variance };
+}
+
+// Helper function to analyze data structure
+function analyzeDataStructure(headers: string[], rows: string[][]) {
+  const analysis: any = {
+    totalRows: rows.length,
+    totalColumns: headers.length,
+    columns: []
+  };
+
+  for (let colIdx = 0; colIdx < headers.length; colIdx++) {
+    const values = rows.map(r => r[colIdx]).filter(v => v && v.trim());
+    const numericValues = values.map(v => parseFloat(v)).filter(v => !isNaN(v));
+    
+    const column: any = {
+      name: headers[colIdx],
+      type: numericValues.length > values.length * 0.7 ? 'numeric' : 'categorical',
+      uniqueCount: new Set(values).size,
+      missingCount: rows.length - values.length,
+      missingPercent: ((rows.length - values.length) / rows.length * 100).toFixed(2)
+    };
+
+    if (column.type === 'numeric' && numericValues.length > 0) {
+      column.statistics = calculateStatistics(numericValues);
+    }
+
+    analysis.columns.push(column);
+  }
+
+  return analysis;
+}
+
 export const appRouter = router({
   system: systemRouter,
 
@@ -84,7 +130,7 @@ export const appRouter = router({
           input.chartType,
           input.labelColumn,
           input.datasets,
-          input.datasetColors,
+          input.datasetColors as any,
           input.palette,
           input.baseColor,
           input.canvasBg,
@@ -129,7 +175,7 @@ export const appRouter = router({
       }),
   }),
 
-  // AI Insights generation
+  // AI Insights generation with detailed analysis
   insights: router({
     generate: protectedProcedure
       .input(z.object({
@@ -142,34 +188,67 @@ export const appRouter = router({
           // Delete existing insights for this dataset
           await db.deleteDatasetInsights(input.datasetId);
 
-          // Prepare data summary for LLM
-          const lines = input.csvContent.trim().split('\n').slice(0, 11); // First 10 data rows
-          const dataSample = lines.join('\n');
+          // Parse CSV data
+          const lines = input.csvContent.trim().split('\n');
+          const rows = lines.slice(1).map(line => line.split(',').map(cell => cell.trim()));
 
-          // Generate insights using LLM
+          // Analyze data structure
+          const dataStructure = analyzeDataStructure(input.headers, rows);
+
+          // Prepare comprehensive data summary for LLM
+          const dataSample = lines.slice(0, 21).join('\n'); // First 20 data rows
+          
+          // Generate comprehensive analysis using LLM
           const response = await invokeLLM({
             messages: [
               {
                 role: "system" as const,
-                content: `You are a data analyst expert. Analyze the provided CSV data and generate 3-4 key insights.
-                
-For each insight, provide:
-1. A clear, concise title
-2. A detailed explanation of what the data shows
-3. A confidence level (0-100) based on data completeness
+                content: `You are a professional data analyst and business intelligence expert. 
+Analyze the provided CSV data comprehensively and generate detailed, multi-faceted insights.
 
-Format your response as JSON array with objects containing: { title, content, type, confidence }
-Types: summary, trends, anomalies, recommendations`
+Provide analysis in the following categories:
+1. OVERVIEW: Dataset structure, size, and composition
+2. DATA QUALITY: Missing values, outliers, data consistency
+3. STATISTICAL ANALYSIS: Key metrics, distributions, correlations
+4. TRENDS & PATTERNS: Temporal trends, seasonal patterns, cycles
+5. ANOMALIES: Unusual values, outliers, data inconsistencies
+6. BUSINESS INSIGHTS: Actionable insights for decision-making
+7. RECOMMENDATIONS: Specific, actionable next steps
+8. RISKS & CONSIDERATIONS: Data quality issues, limitations
+
+For each insight, provide:
+- A clear, professional title
+- Detailed explanation with specific numbers and percentages
+- Business relevance and impact
+- Confidence level (0-100) based on data completeness
+- Recommended action
+
+Format your response as a JSON array with objects containing:
+{ title, content, category, confidence, actionable }
+
+Categories: overview, quality, statistics, trends, anomalies, insights, recommendations, risks`
               },
               {
                 role: "user" as const,
-                content: `Analyze this CSV data:\n\nHeaders: ${input.headers.join(', ')}\n\nData sample:\n${dataSample}`
+                content: `Analyze this CSV data comprehensively:
+
+Headers: ${input.headers.join(', ')}
+Total Rows: ${rows.length}
+Total Columns: ${input.headers.length}
+
+Data Structure Analysis:
+${JSON.stringify(dataStructure, null, 2)}
+
+Data Sample (first 20 rows):
+${dataSample}
+
+Provide 8-12 detailed, professional insights covering all analysis categories.`
               }
             ] as any,
             response_format: {
               type: "json_schema",
               json_schema: {
-                name: "data_insights",
+                name: "comprehensive_data_analysis",
                 strict: true,
                 schema: {
                   type: "object",
@@ -181,10 +260,14 @@ Types: summary, trends, anomalies, recommendations`
                         properties: {
                           title: { type: "string" },
                           content: { type: "string" },
-                          type: { type: "string", enum: ["summary", "trends", "anomalies", "recommendations"] },
-                          confidence: { type: "integer", minimum: 0, maximum: 100 }
+                          category: { 
+                            type: "string", 
+                            enum: ["overview", "quality", "statistics", "trends", "anomalies", "insights", "recommendations", "risks"]
+                          },
+                          confidence: { type: "integer", minimum: 0, maximum: 100 },
+                          actionable: { type: "boolean" }
                         },
-                        required: ["title", "content", "type", "confidence"],
+                        required: ["title", "content", "category", "confidence", "actionable"],
                         additionalProperties: false
                       }
                     }
@@ -209,7 +292,7 @@ Types: summary, trends, anomalies, recommendations`
           for (const insight of insights) {
             await db.createDataInsight(
               input.datasetId,
-              insight.type,
+              insight.category,
               insight.title,
               insight.content,
               insight.confidence
