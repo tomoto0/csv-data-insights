@@ -495,11 +495,13 @@ export default function Home() {
                       if (!csvData || !datasetId) return;
                       setIsCleaning(true);
                       try {
+                        // Construct CSV content with headers and data rows
+                        const csvLines = [csvData.headers.join(','), ...csvData.rows.map(row => row.join(','))];
+                        const csvContent = csvLines.join('\n');
+                        
                         const result = await cleanDataMutation.mutateAsync({
                           datasetId,
-                          csvContent: csvData.rows.map((row, idx) => 
-                            idx === 0 ? csvData.headers.join(',') : row.join(',')
-                          ).join('\n'),
+                          csvContent,
                           headers: csvData.headers,
                         });
                         setCleaningResult(result);
