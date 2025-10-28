@@ -15,6 +15,13 @@
       "when": 1761204614069,
       "tag": "0001_past_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1761558916687,
+      "tag": "0002_medical_medusa",
+      "breakpoints": true
     }
   ]
 }

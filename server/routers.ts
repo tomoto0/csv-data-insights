@@ -315,6 +315,105 @@ Provide 8-12 detailed, professional insights covering all analysis categories.`
         return await db.getDatasetInsights(input.datasetId);
       }),
   }),
+
+  // Data Cleaning operations
+  cleaning: router({
+    clean: protectedProcedure
+      .input(z.object({
+        datasetId: z.number(),
+        csvContent: z.string(),
+        headers: z.array(z.string()),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          // Parse CSV data
+          const lines = input.csvContent.trim().split('\n');
+          const rows = lines.slice(1).map(line => line.split(',').map(cell => cell.trim()));
+
+          // Use Manus LLM to clean and fix the data
+          const response = await invokeLLM({
+            messages: [
+              {
+                role: "system" as const,
+                content: `You are a professional data cleaning expert. Analyze the provided CSV data and:
+1. Identify data quality issues (missing values, inconsistent formatting, duplicates, outliers)
+2. Suggest fixes for column/row positioning issues
+3. Improve column labels if needed
+4. Handle missing values appropriately
+5. Standardize data formats
+
+Provide a cleaned CSV output and a detailed report of all changes made.
+
+Output format:
+CLEANED_CSV_START
+[cleaned CSV content here]
+CLEANED_CSV_END
+
+REPORT_START
+[JSON report here]
+REPORT_END`
+              },
+              {
+                role: "user" as const,
+                content: `Clean this CSV data:
+
+Headers: ${input.headers.join(', ')}
+
+Data (first 20 rows):
+${lines.slice(0, 21).join('\n')}
+
+Total rows: ${rows.length}
+Total columns: ${input.headers.length}`
+              }
+            ] as any,
+          });
+
+          // Parse the response
+          const content = response.choices[0]?.message?.content as string;
+          if (!content) {
+            throw new Error("No content in LLM response");
+          }
+
+          // Extract cleaned CSV and report
+          const csvMatch = content.match(/CLEANED_CSV_START\n([\s\S]*?)\nCLEANED_CSV_END/);
+          const reportMatch = content.match(/REPORT_START\n([\s\S]*?)\nREPORT_END/);
+
+          if (!csvMatch || !reportMatch) {
+            throw new Error("Invalid response format from LLM");
+          }
+
+          const cleanedCsv = csvMatch[1];
+          const reportStr = reportMatch[1];
+          const cleaningReport = JSON.parse(reportStr);
+
+          // Store cleaning result in database
+          await db.createCleaningResult(
+            input.datasetId,
+            input.csvContent,
+            cleanedCsv,
+            cleaningReport
+          );
+
+          return {
+            success: true,
+            cleanedCsv,
+            report: cleaningReport
+          };
+        } catch (error) {
+          console.error("Error cleaning data:", error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to clean data'
+          });
+        }
+      }),
+
+    getResult: protectedProcedure
+      .input(z.object({ datasetId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getLatestCleaningResult(input.datasetId);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

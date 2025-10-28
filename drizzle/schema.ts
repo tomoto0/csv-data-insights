@@ -82,3 +82,20 @@ export const dataInsights = mysqlTable("dataInsights", {
 export type DataInsight = typeof dataInsights.$inferSelect;
 export type InsertDataInsight = typeof dataInsights.$inferInsert;
 
+
+
+/**
+ * Data Cleaning Results table - stores AI-cleaned CSV data and cleaning details
+ */
+export const dataCleaningResults = mysqlTable("dataCleaningResults", {
+  id: int("id").autoincrement().primaryKey(),
+  datasetId: int("datasetId").notNull(),
+  originalCsv: text("originalCsv").notNull(),
+  cleanedCsv: text("cleanedCsv").notNull(),
+  cleaningReport: json("cleaningReport").$type<any>().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DataCleaningResult = typeof dataCleaningResults.$inferSelect;
+export type InsertDataCleaningResult = typeof dataCleaningResults.$inferInsert;
+

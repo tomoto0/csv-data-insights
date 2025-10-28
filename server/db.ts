@@ -1,6 +1,6 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, csvDatasets, chartConfigs, dataInsights, CsvDataset, ChartConfig, DataInsight } from "../drizzle/schema";
+import { InsertUser, users, csvDatasets, chartConfigs, dataInsights, dataCleaningResults, CsvDataset, ChartConfig, DataInsight, DataCleaningResult } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -216,5 +216,43 @@ export async function deleteDatasetInsights(datasetId: number) {
   if (!db) throw new Error("Database not available");
 
   return await db.delete(dataInsights).where(eq(dataInsights.datasetId, datasetId));
+}
+
+
+
+// Data Cleaning Results queries
+export async function createCleaningResult(
+  datasetId: number,
+  originalCsv: string,
+  cleanedCsv: string,
+  cleaningReport: any
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(dataCleaningResults).values({
+    datasetId,
+    originalCsv,
+    cleanedCsv,
+    cleaningReport,
+  });
+
+  return result;
+}
+
+export async function getCleaningResult(datasetId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(dataCleaningResults).where(eq(dataCleaningResults.datasetId, datasetId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getLatestCleaningResult(datasetId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(dataCleaningResults).where(eq(dataCleaningResults.datasetId, datasetId)).orderBy(desc(dataCleaningResults.createdAt)).limit(1);
+  return result.length > 0 ? result[0] : null;
 }
 

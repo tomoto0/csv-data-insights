@@ -67,10 +67,14 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showCleaningDialog, setShowCleaningDialog] = useState(false);
+  const [cleaningResult, setCleaningResult] = useState<any>(null);
+  const [isCleaning, setIsCleaning] = useState(false);
 
   const datasetsQuery = trpc.csv.list.useQuery(undefined, { enabled: isAuthenticated });
   const uploadMutation = trpc.csv.upload.useMutation();
   const generateInsightsMutation = trpc.insights.generate.useMutation();
+  const cleanDataMutation = trpc.cleaning.clean.useMutation();
   const [datasetId, setDatasetId] = useState<number | null>(null);
   const insightsQuery = trpc.insights.list.useQuery(
     { datasetId: datasetId || 0 },
@@ -455,6 +459,75 @@ export default function Home() {
                 ))}
             </div>
 
+            {/* Data Cleaning Section */}
+            <Card className="shadow-lg border-l-4 border-l-indigo-600">
+              <CardHeader className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-indigo-600" />
+                  AI Data Cleaning
+                </CardTitle>
+                <CardDescription>Automatically fix data quality issues, standardize formats, and clean your dataset</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">Our AI engine will:</p>
+                  <ul className="space-y-2 text-sm text-slate-600">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span>Identify and fix data quality issues</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span>Standardize data formats and types</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span>Handle missing values appropriately</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <span>Improve column labels and structure</span>
+                    </li>
+                  </ul>
+                  <Button 
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold mt-4"
+                    onClick={async () => {
+                      if (!csvData || !datasetId) return;
+                      setIsCleaning(true);
+                      try {
+                        const result = await cleanDataMutation.mutateAsync({
+                          datasetId,
+                          csvContent: csvData.rows.map((row, idx) => 
+                            idx === 0 ? csvData.headers.join(',') : row.join(',')
+                          ).join('\n'),
+                          headers: csvData.headers,
+                        });
+                        setCleaningResult(result);
+                        setShowCleaningDialog(true);
+                      } catch (error) {
+                        console.error('Cleaning error:', error);
+                      } finally {
+                        setIsCleaning(false);
+                      }
+                    }}
+                    disabled={isCleaning}
+                  >
+                    {isCleaning ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Cleaning Data...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Clean & Fix Data
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Export Section */}
             <Card className="shadow-lg">
               <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b">
@@ -538,6 +611,100 @@ export default function Home() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Data Cleaning Results Dialog */}
+      <Dialog open={showCleaningDialog} onOpenChange={setShowCleaningDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Data Cleaning Results</DialogTitle>
+            <DialogDescription>
+              Review the cleaning report and download the cleaned CSV file
+            </DialogDescription>
+          </DialogHeader>
+
+          {cleaningResult && (
+            <div className="space-y-6">
+              {/* Cleaning Report */}
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-green-900 mb-2">Issues Found & Fixed</h3>
+                  <ul className="space-y-1 text-sm text-green-800">
+                    {cleaningResult.report?.issuesFound?.map((issue: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-blue-900 mb-2">Fixes Applied</h3>
+                  <ul className="space-y-1 text-sm text-blue-800">
+                    {cleaningResult.report?.fixesApplied?.map((fix: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <span>{fix}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <p className="text-xs text-slate-600 mb-1">Rows Affected</p>
+                    <p className="text-2xl font-bold text-slate-900">{cleaningResult.report?.rowsAffected || 0}</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <p className="text-xs text-slate-600 mb-1">Columns Affected</p>
+                    <p className="text-2xl font-bold text-slate-900">{cleaningResult.report?.columnsAffected || 0}</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <p className="text-xs text-slate-600 mb-1">Quality Improvement</p>
+                    <p className="text-2xl font-bold text-green-600">{cleaningResult.report?.dataQualityImprovement || 0}%</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview of cleaned data */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-slate-900">Cleaned Data Preview</h3>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto">
+                  <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+                    {cleaningResult.cleanedCsv?.split('\n').slice(0, 10).join('\n')}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Download button */}
+              <div className="flex gap-3">
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    const element = document.createElement('a');
+                    element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(cleaningResult.cleanedCsv));
+                    element.setAttribute('download', `cleaned_${fileName || 'data'}.csv`);
+                    element.style.display = 'none';
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Cleaned CSV
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowCleaningDialog(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
