@@ -492,22 +492,33 @@ export default function Home() {
                   <Button 
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold mt-4"
                     onClick={async () => {
-                      if (!csvData || !datasetId) return;
+                      if (!csvData) {
+                        alert('Please upload a CSV file first');
+                        return;
+                      }
+                      if (!datasetId) {
+                        alert('Please select a dataset');
+                        return;
+                      }
                       setIsCleaning(true);
                       try {
                         // Construct CSV content with headers and data rows
                         const csvLines = [csvData.headers.join(','), ...csvData.rows.map(row => row.join(','))];
                         const csvContent = csvLines.join('\n');
                         
+                        console.log('Sending cleaning request:', { datasetId, csvLength: csvContent.length, headersLength: csvData.headers.length });
+                        
                         const result = await cleanDataMutation.mutateAsync({
                           datasetId,
                           csvContent,
                           headers: csvData.headers,
                         });
+                        console.log('Cleaning result:', result);
                         setCleaningResult(result);
                         setShowCleaningDialog(true);
                       } catch (error) {
                         console.error('Cleaning error:', error);
+                        alert('Error during data cleaning: ' + (error instanceof Error ? error.message : 'Unknown error'));
                       } finally {
                         setIsCleaning(false);
                       }
