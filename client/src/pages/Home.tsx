@@ -267,10 +267,13 @@ export default function Home() {
                           <button
                             key={dataset.id}
                             onClick={async () => {
+                              console.log('Dataset clicked:', { fileName: dataset.fileName, rowCount: dataset.rowCount });
                               const parsed = parseCSV(dataset.rawCsv);
+                              console.log('Parsed CSV:', { headers: parsed.headers.length, rows: parsed.rows.length });
                               setCsvData(parsed);
                               setFileName(dataset.fileName);
                               setDatasetId(dataset.id);
+                              console.log('State updated:', { csvDataHeaders: parsed.headers.length, datasetId: dataset.id });
                               setIsAnalyzing(true);
                               try {
                                 const result = await insightsQuery.refetch();
@@ -492,7 +495,10 @@ export default function Home() {
                   <Button 
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold mt-4"
                     onClick={async () => {
-                      if (!csvData) {
+                      console.log('Clean & Fix Data clicked', { csvData, datasetId, fileName });
+                      
+                      if (!csvData || !csvData.headers || csvData.headers.length === 0) {
+                        console.error('CSV data is missing or invalid', { csvData });
                         alert('Please upload a CSV file first');
                         return;
                       }

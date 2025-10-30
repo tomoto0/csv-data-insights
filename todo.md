@@ -29,7 +29,7 @@
 - [ ] カテゴリ別分析の詳細化
 
 ## Known Issues / Testing
-- [ ] Clean & Fix Dataボタンをクリックしても何も起こらない
+- [x] Clean & Fix Dataボタンをクリックしても"Please upload a CSV file first"と表示されてしまう
 - [ ] 既存データセットクリック時の洞察表示動作確認
 - [ ] Manus LLMの詳細分析結果の確認
 - [ ] パフォーマンステスト（大規模データセット）
