@@ -395,8 +395,6 @@ export default function Home() {
                 variant="outline"
                 onClick={() => {
                   setInsights([]);
-                  setCsvData(null);
-                  setFileName("");
                 }}
               >
                 New Analysis
