@@ -493,10 +493,13 @@ export default function Home() {
                   <Button 
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold mt-4"
                     onClick={async () => {
-                      console.log('Clean & Fix Data clicked', { csvData, datasetId, fileName });
+                      console.log('Clean & Fix Data clicked', { csvData, datasetId, fileName, insightsLength: insights.length });
                       
-                      if (!csvData || !csvData.headers || csvData.headers.length === 0) {
-                        console.error('CSV data is missing or invalid', { csvData });
+                      const currentCsvData = csvData;
+                      console.log('Current CSV Data:', { headers: currentCsvData?.headers?.length, rows: currentCsvData?.rows?.length });
+                      
+                      if (!currentCsvData || !currentCsvData.headers || currentCsvData.headers.length === 0) {
+                        console.error('CSV data is missing or invalid', { csvData: currentCsvData });
                         alert('Please upload a CSV file first');
                         return;
                       }
@@ -507,15 +510,15 @@ export default function Home() {
                       setIsCleaning(true);
                       try {
                         // Construct CSV content with headers and data rows
-                        const csvLines = [csvData.headers.join(','), ...csvData.rows.map(row => row.join(','))];
+                        const csvLines = [currentCsvData.headers.join(','), ...currentCsvData.rows.map(row => row.join(','))];
                         const csvContent = csvLines.join('\n');
                         
-                        console.log('Sending cleaning request:', { datasetId, csvLength: csvContent.length, headersLength: csvData.headers.length });
+                        console.log('Sending cleaning request:', { datasetId, csvLength: csvContent.length, headersLength: currentCsvData.headers.length });
                         
                         const result = await cleanDataMutation.mutateAsync({
                           datasetId,
                           csvContent,
-                          headers: csvData.headers,
+                          headers: currentCsvData.headers,
                         });
                         console.log('Cleaning result:', result);
                         setCleaningResult(result);
