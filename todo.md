@@ -28,6 +28,12 @@
 - [ ] 時系列分析と予測
 - [ ] カテゴリ別分析の詳細化
 
+## SEO Improvements
+- [x] キーワードを追加
+- [x] H2見出しを追加
+- [x] タイトルを30〜60文字に修正
+- [x] 説明（meta description）を50〜160文字で追加
+
 ## Known Issues / Testing
 - [x] Clean & Fix Data機能でcsvDataがnullになっているバグを根本的に修正
 - [ ] 既存データセットクリック時の洞察表示動作確認

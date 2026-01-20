@@ -242,10 +242,10 @@ export default function Home() {
             <div className="lg:col-span-1">
               <Card className="shadow-lg h-full">
                 <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
-                  <CardTitle className="text-lg flex items-center gap-2">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Upload className="w-5 h-5 text-blue-600" />
-                    Upload Data
-                  </CardTitle>
+                    Upload Your CSV Data
+                  </h2>
                   <CardDescription>
                     Start your analysis
                   </CardDescription>
@@ -316,10 +316,10 @@ export default function Home() {
             <div className="lg:col-span-2 space-y-6">
               <Card className="shadow-lg border-l-4 border-l-blue-600">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Brain className="w-5 h-5 text-blue-600" />
-                    Professional Analysis
-                  </CardTitle>
+                    Professional AI-Powered Data Analysis
+                  </h2>
                 </CardHeader>
                 <CardContent className="space-y-3 text-slate-600">
                   <p>Our advanced AI engine performs comprehensive data analysis across multiple dimensions:</p>
@@ -346,10 +346,10 @@ export default function Home() {
 
               <Card className="shadow-lg border-l-4 border-l-purple-600">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Zap className="w-5 h-5 text-purple-600" />
-                    Analysis Categories
-                  </CardTitle>
+                    Comprehensive Analysis Categories
+                  </h2>
                 </CardHeader>
                 <CardContent className="space-y-3 text-slate-600">
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -388,7 +388,7 @@ export default function Home() {
             {/* Header with back button */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-3xl font-bold text-slate-900">Comprehensive Analysis</h2>
+                <h2 className="text-3xl font-bold text-slate-900">AI-Powered Data Analysis Results</h2>
                 <p className="text-slate-600 mt-1">{fileName}</p>
               </div>
               <Button 
