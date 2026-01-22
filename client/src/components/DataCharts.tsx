@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,6 +14,8 @@ import {
 } from 'chart.js';
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Download, Image } from 'lucide-react';
 import ChartCustomizer, { ChartConfig, getColorPalette } from './ChartCustomizer';
 
 // Register Chart.js components
@@ -52,6 +54,20 @@ interface ChartData {
 export default function DataCharts({ data, insights }: DataChartsProps) {
   // Store customization configs for each chart
   const [chartConfigs, setChartConfigs] = useState<Record<number, ChartConfig>>({});
+  const chartRefs = useRef<Record<number, any>>({});
+
+  // Export chart as PNG image
+  const exportChartAsImage = useCallback((chartIndex: number, title: string) => {
+    const chartRef = chartRefs.current[chartIndex];
+    if (chartRef) {
+      const canvas = chartRef.canvas;
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_chart.png`;
+      link.href = url;
+      link.click();
+    }
+  }, []);
 
   // Analyze data to determine chart types
   const baseChartData = useMemo(() => {
@@ -430,19 +446,25 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
   }, []);
 
   // Render chart based on type
-  const renderChart = useCallback((chartData: any, config: ChartConfig) => {
+  const renderChart = useCallback((chartData: any, config: ChartConfig, chartIndex: number) => {
+    const setRef = (ref: any) => {
+      if (ref) {
+        chartRefs.current[chartIndex] = ref;
+      }
+    };
+
     switch (config.type) {
       case 'bar':
       case 'multiBar':
-        return <Bar data={chartData.data} options={chartData.options} />;
+        return <Bar ref={setRef} data={chartData.data} options={chartData.options} />;
       case 'line':
-        return <Line data={chartData.data} options={chartData.options} />;
+        return <Line ref={setRef} data={chartData.data} options={chartData.options} />;
       case 'pie':
-        return <Pie data={chartData.data} options={chartData.options} />;
+        return <Pie ref={setRef} data={chartData.data} options={chartData.options} />;
       case 'doughnut':
         return (
           <div className="relative">
-            <Doughnut data={chartData.data} options={chartData.options} />
+            <Doughnut ref={setRef} data={chartData.data} options={chartData.options} />
             {chartData.confidence !== undefined && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-2xl font-bold text-slate-700">
@@ -500,18 +522,29 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
               key={idx} 
               className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative"
             >
-              <ChartCustomizer
-                chartIndex={idx}
-                initialConfig={config}
-                onConfigChange={handleConfigChange}
-                availableTypes={availableTypes}
-              />
+              <div className="absolute top-2 right-2 z-10 flex gap-1">
+                <ChartCustomizer
+                  chartIndex={idx}
+                  initialConfig={config}
+                  onConfigChange={handleConfigChange}
+                  availableTypes={availableTypes}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-white/80 hover:bg-white border-slate-200"
+                  onClick={() => exportChartAsImage(idx, config.title)}
+                  title="Export chart as PNG"
+                >
+                  <Image className="h-4 w-4 text-slate-600" />
+                </Button>
+              </div>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold text-slate-700">{config.title}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="h-64 flex items-center justify-center">
-                  {renderChart(chartData, config)}
+                  {renderChart(chartData, config, idx)}
                 </div>
               </CardContent>
             </Card>

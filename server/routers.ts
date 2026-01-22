@@ -545,6 +545,56 @@ Data statistics:
       .query(async ({ input }) => {
         return await db.getLatestCleaningResult(input.datasetId);
       }),
+
+    // Export cleaned CSV as a new dataset
+    exportAsDataset: protectedProcedure
+      .input(z.object({
+        datasetId: z.number(),
+        newFileName: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Get the latest cleaning result
+        const cleaningResult = await db.getLatestCleaningResult(input.datasetId);
+        if (!cleaningResult) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'クリーニング結果が見つかりません。先にデータクリーニングを実行してください。'
+          });
+        }
+
+        // Get original dataset for reference
+        const originalDataset = await db.getCsvDataset(input.datasetId);
+        if (!originalDataset) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: '元のデータセットが見つかりません。'
+          });
+        }
+
+        // Parse cleaned CSV to get headers and row count
+        const lines = cleaningResult.cleanedCsv.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        const rowCount = lines.length - 1;
+
+        // Generate new filename
+        const newFileName = input.newFileName || `cleaned_${originalDataset.fileName}`;
+
+        // Create new dataset with cleaned data
+        const result = await db.createCsvDataset(
+          ctx.user.id,
+          newFileName,
+          cleaningResult.cleanedCsv,
+          headers,
+          rowCount
+        );
+
+        return {
+          success: true,
+          fileName: newFileName,
+          rowCount,
+          message: `クリーニング済みデータセット「${newFileName}」を保存しました。`
+        };
+      }),
   }),
 });
 

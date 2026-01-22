@@ -216,9 +216,9 @@ export default function ChartCustomizer({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button
-          variant="ghost"
-          size="sm"
-          className="absolute top-2 right-2 h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-md border border-slate-200 z-10"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 bg-white/80 hover:bg-white border-slate-200"
         >
           <Settings className="w-4 h-4 text-slate-600" />
         </Button>

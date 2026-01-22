@@ -10,7 +10,7 @@ import { useState, useRef, useEffect } from "react";
 import { 
   Loader2, Upload, Sparkles, BarChart3, TrendingUp, AlertCircle, 
   Brain, FileText, Zap, CheckCircle, AlertTriangle, Info, Download,
-  LineChart, PieChart, Activity, Target, Shield, Lightbulb
+  LineChart, PieChart, Activity, Target, Shield, Lightbulb, Save, FolderPlus, Image
 } from "lucide-react";
 
 interface ParsedData {
@@ -76,7 +76,10 @@ export default function Home() {
   const uploadMutation = trpc.csv.upload.useMutation();
   const generateInsightsMutation = trpc.insights.generate.useMutation();
   const cleanDataMutation = trpc.cleaning.clean.useMutation();
+  const exportAsDatasetMutation = trpc.cleaning.exportAsDataset.useMutation();
   const [datasetId, setDatasetId] = useState<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const trpcUtils = trpc.useUtils();
   const insightsQuery = trpc.insights.list.useQuery(
     { datasetId: datasetId || 0 },
     { enabled: !!datasetId }
@@ -718,26 +721,65 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Download button */}
-              <div className="flex gap-3">
-                <Button 
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                  onClick={() => {
-                    const element = document.createElement('a');
-                    element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(cleaningResult.cleanedCsv));
-                    element.setAttribute('download', `cleaned_${fileName || 'data'}.csv`);
-                    element.style.display = 'none';
-                    document.body.appendChild(element);
-                    element.click();
-                    document.body.removeChild(element);
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Cleaned CSV
-                </Button>
+              {/* Export buttons */}
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <Button 
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      const element = document.createElement('a');
+                      element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(cleaningResult.cleanedCsv));
+                      element.setAttribute('download', `cleaned_${fileName || 'data'}.csv`);
+                      element.style.display = 'none';
+                      document.body.appendChild(element);
+                      element.click();
+                      document.body.removeChild(element);
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download CSV
+                  </Button>
+                  <Button 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    onClick={async () => {
+                      if (!datasetId) {
+                        alert('データセットが選択されていません。');
+                        return;
+                      }
+                      setIsExporting(true);
+                      try {
+                        const result = await exportAsDatasetMutation.mutateAsync({
+                          datasetId,
+                          newFileName: `cleaned_${fileName || 'data'}.csv`,
+                        });
+                        // Refresh the datasets list
+                        await trpcUtils.csv.list.invalidate();
+                        alert(result.message);
+                      } catch (error: any) {
+                        console.error('Export error:', error);
+                        alert(error?.message || 'エクスポート中にエラーが発生しました。');
+                      } finally {
+                        setIsExporting(false);
+                      }
+                    }}
+                    disabled={isExporting}
+                  >
+                    {isExporting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <FolderPlus className="w-4 h-4 mr-2" />
+                        Save to Recent
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <Button 
                   variant="outline"
-                  className="flex-1"
+                  className="w-full"
                   onClick={() => setShowCleaningDialog(false)}
                 >
                   Close
