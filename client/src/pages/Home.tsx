@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import DataCharts from "@/components/DataCharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -400,6 +401,11 @@ export default function Home() {
                 New Analysis
               </Button>
             </div>
+
+            {/* Data Visualization Charts */}
+            {csvData && (
+              <DataCharts data={csvData} insights={insights} />
+            )}
 
             {/* Category Filter */}
             <div className="flex gap-2 flex-wrap">
