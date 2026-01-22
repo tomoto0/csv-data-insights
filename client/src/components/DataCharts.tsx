@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import ChartCustomizer, { ChartConfig, getColorPalette } from './ChartCustomizer';
 
 // Register Chart.js components
 ChartJS.register(
@@ -39,32 +40,21 @@ interface DataChartsProps {
   insights?: any[];
 }
 
-// Color palette for charts
-const chartColors = [
-  'rgba(99, 102, 241, 0.8)',   // Indigo
-  'rgba(16, 185, 129, 0.8)',   // Emerald
-  'rgba(245, 158, 11, 0.8)',   // Amber
-  'rgba(239, 68, 68, 0.8)',    // Red
-  'rgba(139, 92, 246, 0.8)',   // Violet
-  'rgba(6, 182, 212, 0.8)',    // Cyan
-  'rgba(236, 72, 153, 0.8)',   // Pink
-  'rgba(34, 197, 94, 0.8)',    // Green
-];
-
-const chartBorderColors = [
-  'rgba(99, 102, 241, 1)',
-  'rgba(16, 185, 129, 1)',
-  'rgba(245, 158, 11, 1)',
-  'rgba(239, 68, 68, 1)',
-  'rgba(139, 92, 246, 1)',
-  'rgba(6, 182, 212, 1)',
-  'rgba(236, 72, 153, 1)',
-  'rgba(34, 197, 94, 1)',
-];
+interface ChartData {
+  type: 'bar' | 'line' | 'pie' | 'doughnut' | 'multiBar';
+  title: string;
+  data: any;
+  options: any;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+}
 
 export default function DataCharts({ data, insights }: DataChartsProps) {
+  // Store customization configs for each chart
+  const [chartConfigs, setChartConfigs] = useState<Record<number, ChartConfig>>({});
+
   // Analyze data to determine chart types
-  const chartData = useMemo(() => {
+  const baseChartData = useMemo(() => {
     if (!data || !data.headers || !data.rows || data.rows.length === 0) {
       return null;
     }
@@ -91,7 +81,7 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
     const categoricalColumns = columnTypes.filter(c => c.type === 'categorical');
 
     // Generate chart configurations
-    const charts: any[] = [];
+    const charts: ChartData[] = [];
 
     // 1. Bar chart for first numeric column distribution
     if (numericColumns.length > 0) {
@@ -119,27 +109,10 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
       charts.push({
         type: 'bar',
         title: `Distribution of ${numCol.name}`,
-        data: {
-          labels,
-          datasets: [{
-            label: 'Frequency',
-            data: bins,
-            backgroundColor: chartColors[0],
-            borderColor: chartBorderColors[0],
-            borderWidth: 1,
-          }],
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false },
-            title: { display: false },
-          },
-          scales: {
-            y: { beginAtZero: true, title: { display: true, text: 'Count' } },
-            x: { title: { display: true, text: numCol.name } },
-          },
-        },
+        xAxisLabel: numCol.name,
+        yAxisLabel: 'Count',
+        data: { labels, bins },
+        options: {},
       });
     }
 
@@ -163,28 +136,10 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
         charts.push({
           type: 'line',
           title: `${yCol.name} vs ${xCol.name}`,
-          data: {
-            labels: points.map(p => p.x.toFixed(2)),
-            datasets: [{
-              label: yCol.name,
-              data: points.map(p => p.y),
-              borderColor: chartBorderColors[1],
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              fill: true,
-              tension: 0.4,
-            }],
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { display: true },
-              title: { display: false },
-            },
-            scales: {
-              y: { title: { display: true, text: yCol.name } },
-              x: { title: { display: true, text: xCol.name } },
-            },
-          },
+          xAxisLabel: xCol.name,
+          yAxisLabel: yCol.name,
+          data: { points, xCol: xCol.name, yCol: yCol.name },
+          options: {},
         });
       }
     }
@@ -208,22 +163,8 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
         charts.push({
           type: 'pie',
           title: `Distribution of ${catCol.name}`,
-          data: {
-            labels: sortedEntries.map(e => e[0]),
-            datasets: [{
-              data: sortedEntries.map(e => e[1]),
-              backgroundColor: chartColors.slice(0, sortedEntries.length),
-              borderColor: chartBorderColors.slice(0, sortedEntries.length),
-              borderWidth: 2,
-            }],
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { position: 'right' as const },
-              title: { display: false },
-            },
-          },
+          data: { entries: sortedEntries, colName: catCol.name },
+          options: {},
         });
       }
     }
@@ -236,31 +177,8 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
         charts.push({
           type: 'doughnut',
           title: 'Data Quality Score',
-          data: {
-            labels: ['Quality Score', 'Remaining'],
-            datasets: [{
-              data: [confidence, 100 - confidence],
-              backgroundColor: [
-                confidence >= 80 ? 'rgba(16, 185, 129, 0.8)' : 
-                confidence >= 60 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(239, 68, 68, 0.8)',
-                'rgba(229, 231, 235, 0.5)',
-              ],
-              borderColor: [
-                confidence >= 80 ? 'rgba(16, 185, 129, 1)' : 
-                confidence >= 60 ? 'rgba(245, 158, 11, 1)' : 'rgba(239, 68, 68, 1)',
-                'rgba(229, 231, 235, 1)',
-              ],
-              borderWidth: 2,
-            }],
-          },
-          options: {
-            responsive: true,
-            cutout: '70%',
-            plugins: {
-              legend: { display: false },
-              title: { display: false },
-            },
-          },
+          data: { confidence },
+          options: {},
         });
       }
     }
@@ -269,37 +187,277 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
     if (numericColumns.length >= 2) {
       const sampleSize = Math.min(10, rows.length);
       const sampleRows = rows.slice(0, sampleSize);
-      const labels = sampleRows.map((_, i) => `Row ${i + 1}`);
       
-      const datasets = numericColumns.slice(0, 4).map((col, idx) => ({
-        label: col.name,
-        data: sampleRows.map(row => parseFloat(row[col.index]) || 0),
-        backgroundColor: chartColors[idx],
-        borderColor: chartBorderColors[idx],
-        borderWidth: 1,
-      }));
-
       charts.push({
         type: 'multiBar',
         title: 'Numeric Columns Comparison',
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'top' as const },
-            title: { display: false },
-          },
-          scales: {
-            y: { beginAtZero: true },
-          },
-        },
+        xAxisLabel: 'Row',
+        yAxisLabel: 'Value',
+        data: { sampleRows, numericColumns: numericColumns.slice(0, 4) },
+        options: {},
       });
     }
 
     return { charts, columnTypes, numericColumns, categoricalColumns };
   }, [data, insights]);
 
-  if (!chartData || chartData.charts.length === 0) {
+  // Get config for a specific chart
+  const getChartConfig = useCallback((index: number, baseChart: ChartData): ChartConfig => {
+    if (chartConfigs[index]) {
+      return chartConfigs[index];
+    }
+    return {
+      type: baseChart.type,
+      title: baseChart.title,
+      xAxisLabel: baseChart.xAxisLabel || '',
+      yAxisLabel: baseChart.yAxisLabel || '',
+      colorPalette: 'default',
+      showLegend: baseChart.type === 'pie' || baseChart.type === 'doughnut' || baseChart.type === 'multiBar',
+      showGrid: baseChart.type === 'bar' || baseChart.type === 'line' || baseChart.type === 'multiBar',
+    };
+  }, [chartConfigs]);
+
+  // Handle config change
+  const handleConfigChange = useCallback((index: number, config: ChartConfig) => {
+    setChartConfigs(prev => ({ ...prev, [index]: config }));
+  }, []);
+
+  // Build chart data with customization
+  const buildChartData = useCallback((baseChart: ChartData, config: ChartConfig) => {
+    const palette = getColorPalette(config.colorPalette);
+    
+    switch (config.type) {
+      case 'bar': {
+        const labels = baseChart.data.labels || [];
+        const bins = baseChart.data.bins || [];
+        if (labels.length === 0) {
+          return { data: { labels: [], datasets: [] }, options: {} };
+        }
+        return {
+          data: {
+            labels,
+            datasets: [{
+              label: 'Frequency',
+              data: bins,
+              backgroundColor: palette.colors[0],
+              borderColor: palette.borderColors[0],
+              borderWidth: 1,
+            }],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: config.showLegend },
+              title: { display: false },
+            },
+            scales: {
+              y: { 
+                beginAtZero: true, 
+                title: { display: true, text: config.yAxisLabel || 'Count' },
+                grid: { display: config.showGrid },
+              },
+              x: { 
+                title: { display: true, text: config.xAxisLabel || '' },
+                grid: { display: config.showGrid },
+              },
+            },
+          },
+        };
+      }
+      
+      case 'line': {
+        // Handle both bar->line conversion and native line chart data
+        if (baseChart.data.points) {
+          const { points } = baseChart.data;
+          return {
+            data: {
+              labels: points.map((p: any) => p.x.toFixed(2)),
+              datasets: [{
+                label: config.yAxisLabel || baseChart.data.yCol,
+                data: points.map((p: any) => p.y),
+                borderColor: palette.borderColors[1],
+                backgroundColor: palette.colors[1].replace('0.8', '0.1'),
+                fill: true,
+                tension: 0.4,
+              }],
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { display: config.showLegend },
+                title: { display: false },
+              },
+              scales: {
+                y: { 
+                  title: { display: true, text: config.yAxisLabel || '' },
+                  grid: { display: config.showGrid },
+                },
+                x: { 
+                  title: { display: true, text: config.xAxisLabel || '' },
+                  grid: { display: config.showGrid },
+                },
+              },
+            },
+          };
+        }
+        // Convert bar data to line chart
+        const { labels, bins } = baseChart.data;
+        return {
+          data: {
+            labels: labels || [],
+            datasets: [{
+              label: config.yAxisLabel || 'Value',
+              data: bins || [],
+              borderColor: palette.borderColors[1],
+              backgroundColor: palette.colors[1].replace('0.8', '0.1'),
+              fill: true,
+              tension: 0.4,
+            }],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: config.showLegend },
+              title: { display: false },
+            },
+            scales: {
+              y: { 
+                title: { display: true, text: config.yAxisLabel || '' },
+                grid: { display: config.showGrid },
+              },
+              x: { 
+                title: { display: true, text: config.xAxisLabel || '' },
+                grid: { display: config.showGrid },
+              },
+            },
+          },
+        };
+      }
+      
+      case 'pie': {
+        const entries = baseChart.data.entries || [];
+        if (entries.length === 0) {
+          return { data: { labels: [], datasets: [] }, options: {} };
+        }
+        return {
+          data: {
+            labels: entries.map((e: any) => e[0]),
+            datasets: [{
+              data: entries.map((e: any) => e[1]),
+              backgroundColor: palette.colors.slice(0, entries.length),
+              borderColor: palette.borderColors.slice(0, entries.length),
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'right' as const, display: config.showLegend },
+              title: { display: false },
+            },
+          },
+        };
+      }
+      
+      case 'doughnut': {
+        const confidence = baseChart.data.confidence ?? 0;
+        const qualityColor = confidence >= 80 ? palette.colors[1] : 
+                           confidence >= 60 ? palette.colors[2] : palette.colors[3];
+        const qualityBorder = confidence >= 80 ? palette.borderColors[1] : 
+                            confidence >= 60 ? palette.borderColors[2] : palette.borderColors[3];
+        return {
+          data: {
+            labels: ['Quality Score', 'Remaining'],
+            datasets: [{
+              data: [confidence, 100 - confidence],
+              backgroundColor: [qualityColor, 'rgba(229, 231, 235, 0.5)'],
+              borderColor: [qualityBorder, 'rgba(229, 231, 235, 1)'],
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            cutout: '70%',
+            plugins: {
+              legend: { display: config.showLegend },
+              title: { display: false },
+            },
+          },
+          confidence,
+        };
+      }
+      
+      case 'multiBar': {
+        const sampleRows = baseChart.data.sampleRows || [];
+        const numericColumns = baseChart.data.numericColumns || [];
+        if (sampleRows.length === 0 || numericColumns.length === 0) {
+          return { data: { labels: [], datasets: [] }, options: {} };
+        }
+        const labels = sampleRows.map((_: any, i: number) => `Row ${i + 1}`);
+        const datasets = numericColumns.map((col: any, idx: number) => ({
+          label: col.name,
+          data: sampleRows.map((row: any) => parseFloat(row[col.index]) || 0),
+          backgroundColor: palette.colors[idx],
+          borderColor: palette.borderColors[idx],
+          borderWidth: 1,
+        }));
+        return {
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'top' as const, display: config.showLegend },
+              title: { display: false },
+            },
+            scales: {
+              y: { 
+                beginAtZero: true,
+                title: { display: true, text: config.yAxisLabel || 'Value' },
+                grid: { display: config.showGrid },
+              },
+              x: {
+                title: { display: true, text: config.xAxisLabel || 'Row' },
+                grid: { display: config.showGrid },
+              },
+            },
+          },
+        };
+      }
+      
+      default:
+        return { data: {}, options: {} };
+    }
+  }, []);
+
+  // Render chart based on type
+  const renderChart = useCallback((chartData: any, config: ChartConfig) => {
+    switch (config.type) {
+      case 'bar':
+      case 'multiBar':
+        return <Bar data={chartData.data} options={chartData.options} />;
+      case 'line':
+        return <Line data={chartData.data} options={chartData.options} />;
+      case 'pie':
+        return <Pie data={chartData.data} options={chartData.options} />;
+      case 'doughnut':
+        return (
+          <div className="relative">
+            <Doughnut data={chartData.data} options={chartData.options} />
+            {chartData.confidence !== undefined && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl font-bold text-slate-700">
+                  {chartData.confidence}%
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  }, []);
+
+  if (!baseChartData || baseChartData.charts.length === 0) {
     return (
       <Card className="bg-white/80 backdrop-blur-sm border-slate-200">
         <CardHeader>
@@ -321,36 +479,44 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
         Interactive Data Visualizations
+        <span className="text-sm font-normal text-slate-500 ml-2">(Hover over charts to customize)</span>
       </h2>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {chartData.charts.map((chart, idx) => (
-          <Card key={idx} className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold text-slate-700">{chart.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="h-64 flex items-center justify-center">
-                {chart.type === 'bar' && <Bar data={chart.data} options={chart.options} />}
-                {chart.type === 'line' && <Line data={chart.data} options={chart.options} />}
-                {chart.type === 'pie' && <Pie data={chart.data} options={chart.options} />}
-                {chart.type === 'doughnut' && (
-                  <div className="relative">
-                    <Doughnut data={chart.data} options={chart.options} />
-                    {chart.title === 'Data Quality Score' && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-slate-700">
-                          {chart.data.datasets[0].data[0]}%
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {chart.type === 'multiBar' && <Bar data={chart.data} options={chart.options} />}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {baseChartData.charts.map((baseChart, idx) => {
+          const config = getChartConfig(idx, baseChart);
+          const chartData = buildChartData(baseChart, config);
+          
+          // Determine available types based on original chart type
+          let availableTypes: ('bar' | 'line' | 'pie' | 'doughnut' | 'multiBar')[] = ['bar', 'line'];
+          if (baseChart.type === 'pie' || baseChart.type === 'doughnut') {
+            availableTypes = ['pie', 'doughnut'];
+          } else if (baseChart.type === 'multiBar') {
+            availableTypes = ['bar', 'line', 'multiBar'];
+          }
+          
+          return (
+            <Card 
+              key={idx} 
+              className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative"
+            >
+              <ChartCustomizer
+                chartIndex={idx}
+                initialConfig={config}
+                onConfigChange={handleConfigChange}
+                availableTypes={availableTypes}
+              />
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-slate-700">{config.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="h-64 flex items-center justify-center">
+                  {renderChart(chartData, config)}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Data Summary */}
@@ -369,11 +535,11 @@ export default function DataCharts({ data, insights }: DataChartsProps) {
               <div className="text-slate-600">Total Columns</div>
             </div>
             <div className="bg-white/60 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-amber-600">{chartData.numericColumns.length}</div>
+              <div className="text-2xl font-bold text-amber-600">{baseChartData.numericColumns.length}</div>
               <div className="text-slate-600">Numeric Columns</div>
             </div>
             <div className="bg-white/60 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-purple-600">{chartData.categoricalColumns.length}</div>
+              <div className="text-2xl font-bold text-purple-600">{baseChartData.categoricalColumns.length}</div>
               <div className="text-slate-600">Categorical Columns</div>
             </div>
           </div>
