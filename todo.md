@@ -80,3 +80,7 @@
 - [x] Exportボタンの追加（クリーニング完了後に表示）
 - [x] Download CSVボタン（クリーニング済みデータをダウンロード）
 - [x] Save to Recentボタン（クリーニング済みデータをデータセットとして保存）
+
+## Bug Fixes (New)
+- [x] 分析結果画面でClean & Fix Dataボタンをクリックした際の「Please upload a CSV file first」エラーを修正
+- [x] 既存データセット選択時のcsvData状態管理を改善（datasetsQueryから再取得）

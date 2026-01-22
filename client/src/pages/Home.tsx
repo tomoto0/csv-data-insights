@@ -504,16 +504,25 @@ export default function Home() {
                     onClick={async () => {
                       console.log('Clean & Fix Data clicked', { csvData, datasetId, fileName, insightsLength: insights.length });
                       
-                      const currentCsvData = csvData;
-                      console.log('Current CSV Data:', { headers: currentCsvData?.headers?.length, rows: currentCsvData?.rows?.length });
+                      if (!datasetId) {
+                        alert('Please select a dataset');
+                        return;
+                      }
+
+                      // Get the dataset from the database to ensure we have the latest data
+                      const dataset = datasetsQuery.data?.find(d => d.id === datasetId);
+                      if (!dataset) {
+                        alert('Dataset not found. Please select a dataset again.');
+                        return;
+                      }
+
+                      // Parse the CSV data from the dataset
+                      const currentCsvData = parseCSV(dataset.rawCsv);
+                      console.log('Current CSV Data from dataset:', { headers: currentCsvData?.headers?.length, rows: currentCsvData?.rows?.length });
                       
                       if (!currentCsvData || !currentCsvData.headers || currentCsvData.headers.length === 0) {
                         console.error('CSV data is missing or invalid', { csvData: currentCsvData });
-                        alert('Please upload a CSV file first');
-                        return;
-                      }
-                      if (!datasetId) {
-                        alert('Please select a dataset');
+                        alert('Failed to load CSV data. Please try selecting the dataset again.');
                         return;
                       }
                       setIsCleaning(true);
