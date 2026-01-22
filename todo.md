@@ -36,6 +36,8 @@
 - [x] OGP画像を生成して設定
 
 ## Known Issues / Testing
+- [x] Clean & Fix Data機能の500エラーを修正
+- [x] エラーメッセージをユーザーにわかりやすい内容に改善
 - [x] Clean & Fix Data機能でcsvDataがnullになっているバグを根本的に修正
 - [ ] 既存データセットクリック時の洞察表示動作確認
 - [ ] Manus LLMの詳細分析結果の確認

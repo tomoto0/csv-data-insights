@@ -523,9 +523,23 @@ export default function Home() {
                         console.log('Cleaning result:', result);
                         setCleaningResult(result);
                         setShowCleaningDialog(true);
-                      } catch (error) {
+                      } catch (error: any) {
                         console.error('Cleaning error:', error);
-                        alert('Error during data cleaning: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                        // Display user-friendly error message
+                        let errorMessage = 'データのクリーニング中にエラーが発生しました。';
+                        if (error?.message) {
+                          // Use server-provided message if available
+                          if (error.message.includes('AI') || error.message.includes('タイムアウト') || error.message.includes('混雑')) {
+                            errorMessage = error.message;
+                          } else if (error.message.includes('Failed to clean data')) {
+                            errorMessage = 'AIデータクリーニングに失敗しました。\n\n考えられる原因:\n・ データ形式が複雑すぎる\n・ ファイルサイズが大きすぎる\n・ AIサービスが一時的に利用できない\n\nしばらくしてから再度お試しください。';
+                          } else if (error.message.includes('Unauthorized') || error.message.includes('401')) {
+                            errorMessage = 'セッションが切れました。ページをリロードしてください。';
+                          } else {
+                            errorMessage = `エラー: ${error.message}`;
+                          }
+                        }
+                        alert(errorMessage);
                       } finally {
                         setIsCleaning(false);
                       }

@@ -328,63 +328,179 @@ Provide 8-12 detailed, professional insights covering all analysis categories.`
         try {
           // Parse CSV data
           const lines = input.csvContent.trim().split('\n');
-          const rows = lines.slice(1).map(line => line.split(',').map(cell => cell.trim()));
+          const rows = lines.slice(1).map(line => {
+            // Handle CSV parsing with quoted fields
+            const cells: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                cells.push(current.trim());
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            cells.push(current.trim());
+            return cells;
+          });
 
-          // Use Manus LLM to clean and fix the data
+          // Analyze data for cleaning
+          const dataAnalysis = {
+            totalRows: rows.length,
+            totalColumns: input.headers.length,
+            emptyValues: 0,
+            inconsistentFormats: [] as string[],
+            duplicateRows: 0,
+          };
+
+          // Count empty values
+          rows.forEach(row => {
+            row.forEach(cell => {
+              if (!cell || cell.trim() === '' || cell.toLowerCase() === 'null' || cell.toLowerCase() === 'na' || cell.toLowerCase() === 'n/a') {
+                dataAnalysis.emptyValues++;
+              }
+            });
+          });
+
+          // Check for duplicate rows
+          const rowStrings = rows.map(r => r.join('|'));
+          const uniqueRows = new Set(rowStrings);
+          dataAnalysis.duplicateRows = rows.length - uniqueRows.size;
+
+          // Use Manus LLM to clean and fix the data with structured output
           const response = await invokeLLM({
             messages: [
               {
                 role: "system" as const,
-                content: `You are a professional data cleaning expert. Analyze the provided CSV data and:
-1. Identify data quality issues (missing values, inconsistent formatting, duplicates, outliers)
-2. Suggest fixes for column/row positioning issues
-3. Improve column labels if needed
-4. Handle missing values appropriately
-5. Standardize data formats
+                content: `You are a professional data cleaning expert. Your task is to analyze CSV data and provide cleaning recommendations.
 
-Provide a cleaned CSV output and a detailed report of all changes made.
+You MUST respond with valid JSON in the following exact format:
+{
+  "cleanedHeaders": ["header1", "header2", ...],
+  "cleanedRows": [["cell1", "cell2", ...], ...],
+  "changes": [
+    {"type": "header_rename", "original": "old_name", "new": "new_name", "reason": "explanation"},
+    {"type": "value_fix", "row": 1, "column": "col_name", "original": "old_val", "new": "new_val", "reason": "explanation"},
+    {"type": "missing_value", "row": 2, "column": "col_name", "action": "filled with mean/removed/marked", "reason": "explanation"}
+  ],
+  "summary": {
+    "totalChanges": 5,
+    "headersRenamed": 2,
+    "valuesFixed": 3,
+    "missingValuesHandled": 1,
+    "duplicatesRemoved": 0,
+    "qualityScore": 85
+  }
+}
 
-Output format:
-CLEANED_CSV_START
-[cleaned CSV content here]
-CLEANED_CSV_END
-
-REPORT_START
-[JSON report here]
-REPORT_END`
+Rules:
+1. Keep the same number of columns
+2. Clean header names (remove special chars, standardize casing)
+3. Handle missing values (fill with appropriate defaults or mark as N/A)
+4. Fix obvious typos and formatting issues
+5. Standardize date formats, numbers, etc.
+6. Only include the first 20 rows in cleanedRows for efficiency`
               },
               {
                 role: "user" as const,
-                content: `Clean this CSV data:
+                content: `Please clean this CSV data and return the result as JSON:
 
-Headers: ${input.headers.join(', ')}
+Headers: ${JSON.stringify(input.headers)}
 
-Data (first 20 rows):
-${lines.slice(0, 21).join('\n')}
+Sample data (first 15 rows):
+${JSON.stringify(rows.slice(0, 15))}
 
-Total rows: ${rows.length}
-Total columns: ${input.headers.length}`
+Data statistics:
+- Total rows: ${rows.length}
+- Total columns: ${input.headers.length}
+- Empty values found: ${dataAnalysis.emptyValues}
+- Potential duplicate rows: ${dataAnalysis.duplicateRows}`
               }
             ] as any,
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "data_cleaning_result",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    cleanedHeaders: { type: "array", items: { type: "string" } },
+                    cleanedRows: { type: "array", items: { type: "array", items: { type: "string" } } },
+                    changes: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          type: { type: "string" },
+                          original: { type: "string" },
+                          new: { type: "string" },
+                          reason: { type: "string" },
+                          row: { type: "number" },
+                          column: { type: "string" },
+                          action: { type: "string" }
+                        },
+                        required: ["type", "reason"],
+                        additionalProperties: true
+                      }
+                    },
+                    summary: {
+                      type: "object",
+                      properties: {
+                        totalChanges: { type: "number" },
+                        headersRenamed: { type: "number" },
+                        valuesFixed: { type: "number" },
+                        missingValuesHandled: { type: "number" },
+                        duplicatesRemoved: { type: "number" },
+                        qualityScore: { type: "number" }
+                      },
+                      required: ["totalChanges", "qualityScore"],
+                      additionalProperties: true
+                    }
+                  },
+                  required: ["cleanedHeaders", "cleanedRows", "changes", "summary"],
+                  additionalProperties: false
+                }
+              }
+            } as any,
           });
 
           // Parse the response
           const content = response.choices[0]?.message?.content as string;
           if (!content) {
-            throw new Error("No content in LLM response");
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'AIからの応答が空です。しばらくしてから再度お試しください。'
+            });
           }
 
-          // Extract cleaned CSV and report
-          const csvMatch = content.match(/CLEANED_CSV_START\n([\s\S]*?)\nCLEANED_CSV_END/);
-          const reportMatch = content.match(/REPORT_START\n([\s\S]*?)\nREPORT_END/);
-
-          if (!csvMatch || !reportMatch) {
-            throw new Error("Invalid response format from LLM");
+          let cleaningResult;
+          try {
+            cleaningResult = JSON.parse(content);
+          } catch (parseError) {
+            console.error("JSON parse error:", parseError, "Content:", content.substring(0, 500));
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'AIの応答を解析できませんでした。再度お試しください。'
+            });
           }
 
-          const cleanedCsv = csvMatch[1];
-          const reportStr = reportMatch[1];
-          const cleaningReport = JSON.parse(reportStr);
+          // Build cleaned CSV
+          const cleanedHeaders = cleaningResult.cleanedHeaders || input.headers;
+          const cleanedRows = cleaningResult.cleanedRows || rows.slice(0, 20);
+          const cleanedCsv = [cleanedHeaders.join(','), ...cleanedRows.map((r: string[]) => r.join(','))].join('\n');
+
+          // Build cleaning report
+          const cleaningReport = {
+            changes: cleaningResult.changes || [],
+            summary: cleaningResult.summary || { totalChanges: 0, qualityScore: 100 },
+            originalStats: dataAnalysis,
+            timestamp: new Date().toISOString()
+          };
 
           // Store cleaning result in database
           await db.createCleaningResult(
@@ -399,11 +515,27 @@ Total columns: ${input.headers.length}`
             cleanedCsv,
             report: cleaningReport
           };
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error cleaning data:", error);
+          
+          // Provide user-friendly error messages
+          let userMessage = 'データのクリーニング中にエラーが発生しました。';
+          
+          if (error instanceof TRPCError) {
+            throw error;
+          }
+          
+          if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
+            userMessage = 'AIの処理がタイムアウトしました。データサイズを小さくするか、しばらくしてから再度お試しください。';
+          } else if (error.message?.includes('rate limit') || error.message?.includes('429')) {
+            userMessage = 'AIサービスが混雑しています。しばらくしてから再度お試しください。';
+          } else if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
+            userMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+          }
+          
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to clean data'
+            message: userMessage
           });
         }
       }),
