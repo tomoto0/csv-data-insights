@@ -33,6 +33,7 @@
 - [x] H2見出しを追加
 - [x] タイトルを30〜60文字に修正
 - [x] 説明（meta description）を50〜160文字で追加
+- [x] OGP画像を生成して設定
 
 ## Known Issues / Testing
 - [x] Clean & Fix Data機能でcsvDataがnullになっているバグを根本的に修正
