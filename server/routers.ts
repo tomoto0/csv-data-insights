@@ -425,7 +425,7 @@ Data statistics:
               type: "json_schema",
               json_schema: {
                 name: "data_cleaning_result",
-                strict: true,
+                strict: false,
                 schema: {
                   type: "object",
                   properties: {
@@ -474,7 +474,7 @@ Data statistics:
           if (!content) {
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
-              message: 'AIからの応答が空です。しばらくしてから再度お試しください。'
+              message: 'Empty response from AI. Please try again later.'
             });
           }
 
@@ -482,10 +482,12 @@ Data statistics:
           try {
             cleaningResult = JSON.parse(content);
           } catch (parseError) {
-            console.error("JSON parse error:", parseError, "Content:", content.substring(0, 500));
+            console.error("JSON parse error:", parseError);
+            console.error("Full AI response content:", content);
+            console.error("Response length:", content.length);
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
-              message: 'AIの応答を解析できませんでした。再度お試しください。'
+              message: 'Failed to parse AI response. Please try again.'
             });
           }
 
@@ -519,18 +521,18 @@ Data statistics:
           console.error("Error cleaning data:", error);
           
           // Provide user-friendly error messages
-          let userMessage = 'データのクリーニング中にエラーが発生しました。';
+          let userMessage = 'An error occurred during data cleaning.';
           
           if (error instanceof TRPCError) {
             throw error;
           }
           
           if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
-            userMessage = 'AIの処理がタイムアウトしました。データサイズを小さくするか、しばらくしてから再度お試しください。';
+            userMessage = 'AI processing timed out. Please reduce data size or try again later.';
           } else if (error.message?.includes('rate limit') || error.message?.includes('429')) {
-            userMessage = 'AIサービスが混雑しています。しばらくしてから再度お試しください。';
+            userMessage = 'AI service is busy. Please try again later.';
           } else if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
-            userMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+            userMessage = 'Network error occurred. Please check your internet connection.';
           }
           
           throw new TRPCError({
@@ -558,7 +560,7 @@ Data statistics:
         if (!cleaningResult) {
           throw new TRPCError({
             code: 'NOT_FOUND',
-            message: 'クリーニング結果が見つかりません。先にデータクリーニングを実行してください。'
+            message: 'Cleaning result not found. Please run data cleaning first.'
           });
         }
 
@@ -567,7 +569,7 @@ Data statistics:
         if (!originalDataset) {
           throw new TRPCError({
             code: 'NOT_FOUND',
-            message: '元のデータセットが見つかりません。'
+            message: 'Original dataset not found.'
           });
         }
 
@@ -592,7 +594,7 @@ Data statistics:
           success: true,
           fileName: newFileName,
           rowCount,
-          message: `クリーニング済みデータセット「${newFileName}」を保存しました。`
+          message: `Cleaned dataset "${newFileName}" has been saved.`
         };
       }),
   }),

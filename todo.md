@@ -84,3 +84,8 @@
 ## Bug Fixes (New)
 - [x] 分析結果画面でClean & Fix Dataボタンをクリックした際の「Please upload a CSV file first」エラーを修正
 - [x] 既存データセット選択時のcsvData状態管理を改善（datasetsQueryから再取得）
+
+## Error Message Localization (New)
+- [x] データクリーニング機能のエラーメッセージを英語に変更
+- [x] AIの応答解析エラーを修正（strict modeをfalseに変更）
+- [x] すべてのユーザー向けエラーメッセージを英語に統一
