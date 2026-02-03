@@ -4,9 +4,19 @@
 
 A comprehensive, AI-driven data analysis platform that transforms raw CSV data into actionable insights through advanced statistical analysis, trend detection, anomaly identification, and intelligent data cleaning. Data Insights AI combines cutting-edge machine learning with intuitive data visualization to empower users to make data-driven decisions with confidence.
 
+## Social Media Preview
+
+![Data Insights AI - OGP Image](https://files.manuscdn.com/user_upload_by_module/session_file/120549982/DhTqTIuCsjuMonkJ.png)
+
+*Professional preview image showcasing Data Insights AI's capabilities in data analysis and AI-powered intelligence*
+
 ## Overview
 
 Data Insights AI is designed for data analysts, business intelligence professionals, and organizations seeking to unlock the full potential of their datasets. The platform automates the tedious data preprocessing phase and provides deep, multi-faceted analysis across eight distinct categories, enabling users to focus on strategic decision-making rather than manual data manipulation.
+
+## Live Demo
+
+**Deployed Application**: [https://datainsights-erft3lrq.manus.space](https://datainsights-erft3lrq.manus.space)
 
 ## Key Features
 
@@ -24,13 +34,13 @@ The analysis engine generates insights across eight comprehensive categories: Ov
 
 Each insight includes a confidence score reflecting the AI's certainty level, enabling users to prioritize high-confidence findings. The category filtering system allows users to focus on specific analysis dimensions, while comprehensive reports provide detailed explanations with actionable recommendations.
 
-### Flexible Data Management
-
-Users can upload CSV files up to 10MB in size, store and manage multiple datasets within their account, access previously analyzed datasets through the Recent Datasets feature, and maintain complete data integrity throughout the analysis process. The platform preserves original data while creating separate cleaned versions, ensuring users can always reference the source data.
-
 ### Interactive Chart Customization
 
 The platform features interactive data visualizations with customizable chart types including bar charts, line charts, pie charts, doughnut charts, and multi-series comparisons. Users can select from six color palettes (Default, Ocean, Sunset, Forest, Monochrome, and Vibrant), edit axis labels and chart titles, toggle legend and grid display, and export charts as PNG images for reports and presentations.
+
+### Flexible Data Management
+
+Users can upload CSV files up to 10MB in size, store and manage multiple datasets within their account, access previously analyzed datasets through the Recent Datasets feature, and maintain complete data integrity throughout the analysis process. The platform preserves original data while creating separate cleaned versions, ensuring users can always reference the source data.
 
 ### Export and Sharing Capabilities
 
@@ -310,7 +320,7 @@ data-insights-ai/
 │   │   ├── main.tsx                   # Application entry point
 │   │   └── index.css                  # Global styles and theme
 │   ├── public/                         # Static assets
-│   ├── index.html                     # HTML template
+│   ├── index.html                     # HTML template with OGP meta tags
 │   └── vite.config.ts                 # Vite build configuration
 ├── server/                             # Backend application
 │   ├── routers.ts                     # tRPC procedure definitions

@@ -94,3 +94,10 @@
 - [x] README.mdファイルの作成（アプリ概要、機能、技術仕様）
 - [x] アーキテクチャ図の作成（ASCII図形）
 - [x] セットアップ手順とデプロイメントガイドの追加
+
+## OGP Image & Social Media (New)
+- [x] OGP画像を生成（1200x630px）
+- [x] OGP画像をS3にアップロード
+- [x] HTMLメタタグにOGP画像URLを設定
+- [x] README.mdにOGP画像を表示
+- [x] ソーシャルメディアメタタグの設定完了
